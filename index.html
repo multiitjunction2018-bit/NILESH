@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<meta name="theme-color" content="#1A1A1D" />
+<title>Workout Plan</title>
+<link rel="manifest" href="manifest.json" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #1A1A1D; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+  input::placeholder, textarea::placeholder { color: #6a6a6f; }
+  input, textarea, button { font-family: 'Inter', sans-serif; }
+  #root { min-height: 100vh; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo } = React;
+
+const BODY_PARTS = ["Chest", "Back", "Legs", "Shoulders", "Arms", "Core", "Full Body"];
+const GOALS = ["Strength", "Cardio", "Flexibility", "Endurance", "Mobility"];
+const DAYS = ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"];
+const STORAGE_KEY = "workout_exercises_v1";
+
+function getYouTubeId(url) {
+  if (!url) return null;
+  const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return match ? match[1] : null;
+}
+
+function loadExercises() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveExercises(list) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function chipStyle(color) {
+  return {
+    fontSize: "11px",
+    fontWeight: 700,
+    padding: "3px 10px",
+    borderRadius: "999px",
+    background: color + "22",
+    color: color,
+  };
+}
+
+function Tag({ label, active, onClick, color }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "6px 14px",
+        borderRadius: "999px",
+        border: "1px solid " + (active ? color : "#3a3a3f"),
+        background: active ? color : "transparent",
+        color: active ? "#1A1A1D" : "#A8A6A0",
+        fontSize: "13px",
+        fontWeight: 600,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        transition: "all 0.15s ease",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function ChipSelect({ options, selected, onToggle, color }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+      {options.map((opt) => (
+        <Tag key={opt} label={opt} active={selected.includes(opt)} onClick={() => onToggle(opt)} color={color} />
+      ))}
+    </div>
+  );
+}
+
+function AddExerciseForm({ onAdd, onClose }) {
+  const [name, setName] = useState("");
+  const [notes, setNotes] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [bodyParts, setBodyParts] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [days, setDays] = useState([]);
+  const [error, setError] = useState("");
+
+  const toggle = (arr, setArr, val) => setArr(arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]);
+
+  const handleSubmit = () => {
+    if (!name.trim()) {
+      setError("Exercise ka naam daalo");
+      return;
+    }
+    onAdd({
+      id: "ex_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+      name: name.trim(),
+      notes: notes.trim(),
+      videoUrl: videoUrl.trim(),
+      bodyParts, goals, days,
+      createdAt: Date.now(),
+    });
+  };
+
+  return (
+    <div style={{ background: "#222226", border: "1px solid #3a3a3f", borderRadius: "14px", padding: "24px", marginBottom: "28px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+        <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "18px", color: "#F2F0EB", letterSpacing: "0.5px" }}>NEW EXERCISE</h3>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "#A8A6A0", cursor: "pointer", padding: "4px", fontSize: "20px" }}>✕</button>
+      </div>
+
+      <div style={{ marginBottom: "14px" }}>
+        <label style={{ fontSize: "12px", color: "#A8A6A0", display: "block", marginBottom: "6px", fontWeight: 600 }}>EXERCISE NAME</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Barbell Squat"
+          style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #3a3a3f", background: "#1A1A1D", color: "#F2F0EB", fontSize: "14px" }} />
+      </div>
+
+      <div style={{ marginBottom: "14px" }}>
+        <label style={{ fontSize: "12px", color: "#A8A6A0", display: "block", marginBottom: "6px", fontWeight: 600 }}>VIDEO LINK (OPTIONAL)</label>
+        <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="YouTube URL paste karo"
+          style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #3a3a3f", background: "#1A1A1D", color: "#F2F0EB", fontSize: "14px" }} />
+      </div>
+
+      <div style={{ marginBottom: "14px" }}>
+        <label style={{ fontSize: "12px", color: "#A8A6A0", display: "block", marginBottom: "6px", fontWeight: 600 }}>NOTES (OPTIONAL)</label>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Sets, reps, form tips..." rows={2}
+          style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #3a3a3f", background: "#1A1A1D", color: "#F2F0EB", fontSize: "14px", resize: "vertical" }} />
+      </div>
+
+      <div style={{ marginBottom: "14px" }}>
+        <label style={{ fontSize: "12px", color: "#A8A6A0", display: "block", marginBottom: "8px", fontWeight: 600 }}>BODY PART</label>
+        <ChipSelect options={BODY_PARTS} selected={bodyParts} onToggle={(v) => toggle(bodyParts, setBodyParts, v)} color="#FF6B35" />
+      </div>
+
+      <div style={{ marginBottom: "14px" }}>
+        <label style={{ fontSize: "12px", color: "#A8A6A0", display: "block", marginBottom: "8px", fontWeight: 600 }}>GOAL</label>
+        <ChipSelect options={GOALS} selected={goals} onToggle={(v) => toggle(goals, setGoals, v)} color="#3D8B8B" />
+      </div>
+
+      <div style={{ marginBottom: "20px" }}>
+        <label style={{ fontSize: "12px", color: "#A8A6A0", display: "block", marginBottom: "8px", fontWeight: 600 }}>DAY</label>
+        <ChipSelect options={DAYS} selected={days} onToggle={(v) => toggle(days, setDays, v)} color="#C9A646" />
+      </div>
+
+      {error && <p style={{ color: "#FF6B35", fontSize: "13px", marginBottom: "12px" }}>{error}</p>}
+
+      <button onClick={handleSubmit}
+        style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "none", background: "#FF6B35", color: "#1A1A1D", fontWeight: 700, fontSize: "14px", cursor: "pointer", letterSpacing: "0.5px" }}>
+        ADD EXERCISE
+      </button>
+    </div>
+  );
+}
+
+function ExerciseCard({ exercise, onDelete }) {
+  const [showVideo, setShowVideo] = useState(false);
+  const ytId = getYouTubeId(exercise.videoUrl);
+
+  return (
+    <div style={{ background: "#222226", border: "1px solid #3a3a3f", borderRadius: "14px", padding: "18px", marginBottom: "14px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          <h4 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "16px", color: "#F2F0EB", marginBottom: "8px" }}>{exercise.name}</h4>
+          {exercise.notes && <p style={{ color: "#A8A6A0", fontSize: "13px", margin: "0 0 10px 0", lineHeight: 1.5 }}>{exercise.notes}</p>}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {exercise.bodyParts.map((bp) => <span key={bp} style={chipStyle("#FF6B35")}>{bp}</span>)}
+            {exercise.goals.map((g) => <span key={g} style={chipStyle("#3D8B8B")}>{g}</span>)}
+            {exercise.days.map((d) => <span key={d} style={chipStyle("#C9A646")}>{d}</span>)}
+          </div>
+        </div>
+        <button onClick={() => onDelete(exercise.id)} title="Delete"
+          style={{ background: "none", border: "none", color: "#6a6a6f", cursor: "pointer", padding: "4px", flexShrink: 0, fontSize: "16px" }}>🗑</button>
+      </div>
+
+      {ytId && (
+        <div style={{ marginTop: "14px" }}>
+          {!showVideo ? (
+            <button onClick={() => setShowVideo(true)}
+              style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 14px", borderRadius: "8px", border: "1px solid #FF6B35", background: "transparent", color: "#FF6B35", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
+              ▶ WATCH VIDEO
+            </button>
+          ) : (
+            <div style={{ position: "relative", paddingBottom: "56.25%", borderRadius: "8px", overflow: "hidden" }}>
+              <iframe src={"https://www.youtube.com/embed/" + ytId} title={exercise.name}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [exercises, setExercises] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [filterBP, setFilterBP] = useState([]);
+  const [filterGoal, setFilterGoal] = useState([]);
+  const [filterDay, setFilterDay] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => { setExercises(loadExercises()); }, []);
+
+  const handleAdd = (ex) => {
+    const updated = [ex, ...exercises];
+    setExercises(updated);
+    setShowForm(false);
+    saveExercises(updated);
+  };
+
+  const handleDelete = (id) => {
+    const updated = exercises.filter((e) => e.id !== id);
+    setExercises(updated);
+    saveExercises(updated);
+  };
+
+  const toggleFilter = (arr, setArr, val) => setArr(arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]);
+
+  const filtered = useMemo(() => {
+    return exercises.filter((ex) => {
+      const bpMatch = filterBP.length === 0 || filterBP.some((f) => ex.bodyParts.includes(f));
+      const goalMatch = filterGoal.length === 0 || filterGoal.some((f) => ex.goals.includes(f));
+      const dayMatch = filterDay.length === 0 || filterDay.some((f) => ex.days.includes(f));
+      return bpMatch && goalMatch && dayMatch;
+    });
+  }, [exercises, filterBP, filterGoal, filterDay]);
+
+  const activeFilterCount = filterBP.length + filterGoal.length + filterDay.length;
+
+  return (
+    <div style={{ background: "#1A1A1D", minHeight: "100vh", padding: "28px 20px" }}>
+      <div style={{ maxWidth: "640px", margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+          <div>
+            <h1 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "26px", color: "#F2F0EB", letterSpacing: "0.5px" }}>WORKOUT PLAN</h1>
+            <p style={{ margin: "4px 0 0 0", color: "#A8A6A0", fontSize: "13px" }}>{exercises.length} exercise{exercises.length !== 1 ? "s" : ""} saved</p>
+          </div>
+          <button onClick={() => setShowForm((s) => !s)}
+            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", borderRadius: "10px", border: "none", background: "#FF6B35", color: "#1A1A1D", fontWeight: 700, fontSize: "13px", cursor: "pointer" }}>
+            + ADD
+          </button>
+        </div>
+
+        {showForm && <AddExerciseForm onAdd={handleAdd} onClose={() => setShowForm(false)} />}
+
+        <div style={{ marginBottom: "20px" }}>
+          <button onClick={() => setShowFilters((s) => !s)}
+            style={{ display: "flex", alignItems: "center", gap: "6px", background: "none", border: "1px solid #3a3a3f", borderRadius: "8px", padding: "8px 12px", color: "#A8A6A0", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
+            ⚙ FILTER {activeFilterCount > 0 ? "(" + activeFilterCount + ")" : ""}
+          </button>
+
+          {showFilters && (
+            <div style={{ marginTop: "14px", background: "#222226", border: "1px solid #3a3a3f", borderRadius: "12px", padding: "16px" }}>
+              <div style={{ marginBottom: "12px" }}>
+                <label style={{ fontSize: "11px", color: "#A8A6A0", display: "block", marginBottom: "8px", fontWeight: 700 }}>BODY PART</label>
+                <ChipSelect options={BODY_PARTS} selected={filterBP} onToggle={(v) => toggleFilter(filterBP, setFilterBP, v)} color="#FF6B35" />
+              </div>
+              <div style={{ marginBottom: "12px" }}>
+                <label style={{ fontSize: "11px", color: "#A8A6A0", display: "block", marginBottom: "8px", fontWeight: 700 }}>GOAL</label>
+                <ChipSelect options={GOALS} selected={filterGoal} onToggle={(v) => toggleFilter(filterGoal, setFilterGoal, v)} color="#3D8B8B" />
+              </div>
+              <div>
+                <label style={{ fontSize: "11px", color: "#A8A6A0", display: "block", marginBottom: "8px", fontWeight: 700 }}>DAY</label>
+                <ChipSelect options={DAYS} selected={filterDay} onToggle={(v) => toggleFilter(filterDay, setFilterDay, v)} color="#C9A646" />
+              </div>
+              {activeFilterCount > 0 && (
+                <button onClick={() => { setFilterBP([]); setFilterGoal([]); setFilterDay([]); }}
+                  style={{ marginTop: "14px", background: "none", border: "none", color: "#FF6B35", fontSize: "12px", fontWeight: 700, cursor: "pointer", padding: 0 }}>
+                  CLEAR FILTERS
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "50px 0", color: "#6a6a6f" }}>
+            <p style={{ fontSize: "14px" }}>
+              {exercises.length === 0 ? "Abhi koi exercise nahi hai. ADD button dabao aur shuru karo." : "Filter se kuch match nahi hua."}
+            </p>
+          </div>
+        ) : (
+          filtered.map((ex) => <ExerciseCard key={ex.id} exercise={ex} onDelete={handleDelete} />)
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
